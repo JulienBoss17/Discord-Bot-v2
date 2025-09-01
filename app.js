@@ -7,7 +7,7 @@ const path = require("path");
 const { formatDistanceToNow } = require('date-fns');
 const { fr } = require('date-fns/locale');
 const LinkedAccount = require("./models/LinkedAccount");
-const requireLinked = require("./utils/requireLinked");
+const { requireLinked } = require("./utils/requireLinked");
 const { InteractionResponseFlags } = require('discord-api-types/v10');
 
 const clientId = process.env.CLIENT_ID;
@@ -53,6 +53,7 @@ const commandFiles = getAllCommandFiles(commandsPath);
 
 for (const file of commandFiles) {
   const command = require(file);
+  console.log("Chargement de la commande :", file); // <-- debug
   if (command.data) {
     commands.push(command.data.toJSON());
     client.commands.set(command.data.name, command);
@@ -60,6 +61,7 @@ for (const file of commandFiles) {
     console.warn(`⚠️ La commande ${file} ne contient pas 'data'.`);
   }
 }
+
 
 // --- Enregistrement des commandes auprès de Discord ---
 const rest = new REST({ version: "9" }).setToken(token);
@@ -115,11 +117,12 @@ client.on("interactionCreate", async interaction => {
   if (!command) return;
 
   // Middleware automatique pour toutes les commandes LoL
-  if (command.lolCommand) {
-    const pseudo = await requireLinked(interaction);
-    if (!pseudo) return; // Middleware a déjà répondu si non lié
-    interaction.lolPseudo = pseudo;
-  }
+if (command.lolCommand) {
+  const account = await requireLinked(interaction);
+  if (!account) return; // Middleware a déjà répondu si non lié
+  interaction.riotAccount = account; // stocker l'objet complet
+}
+
 
   try {
     await command.execute(interaction);
@@ -127,7 +130,7 @@ client.on("interactionCreate", async interaction => {
     console.error(error);
     await interaction.reply({
       content: "Ton message",
-      flags: InteractionResponseFlags.Ephemeral
+      flags: InteractionResponseFlags.ephemeral
     });
   }
 });

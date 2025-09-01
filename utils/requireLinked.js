@@ -1,32 +1,19 @@
-const LinkedAccount = require('../models/LinkedAccount');
-
-// Cache central
-const linkedCache = new Map();
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+// utils/requireLinked.js
+const LinkedAccount = require("../models/LinkedAccount");
 
 async function requireLinked(interaction) {
   const discordId = interaction.user.id;
 
-  // Vérifier cache
-  const cached = linkedCache.get(discordId);
-  const now = Date.now();
-  if (cached && now - cached.timestamp < CACHE_DURATION) {
-    return cached.pseudo;
-  }
-
-  // Vérifier MongoDB
-  const linked = await LinkedAccount.findOne({ discordId });
-  if (!linked) {
+  const account = await LinkedAccount.findOne({ discordId });
+  if (!account) {
     await interaction.reply({
-      content: "❌ Tu n'as pas lié ton compte. Utilise `/link <pseudo>`.",
+      content: "❌ Tu dois d’abord lier ton compte Riot avec `/link Pseudo#Tag`.",
       ephemeral: true
     });
     return null;
   }
 
-  // Mettre à jour le cache
-  linkedCache.set(discordId, { pseudo: linked.lolPseudo, timestamp: now });
-  return linked.lolPseudo;
+  return account; // renvoie l'objet complet { discordId, lolPseudo, tagLine, puuid }
 }
 
-module.exports = { requireLinked, linkedCache };
+module.exports = { requireLinked };
