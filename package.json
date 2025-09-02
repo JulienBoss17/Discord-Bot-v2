@@ -16,6 +16,7 @@
     "dotenv": "^17.2.1",
     "fs": "^0.0.1-security",
     "mongoose": "^8.18.0",
+    "node-cache": "^5.1.2",
     "node-cron": "^4.2.1",
     "node-fetch": "^3.3.2",
     "passport": "^0.7.0",

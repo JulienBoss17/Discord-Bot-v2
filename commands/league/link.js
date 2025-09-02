@@ -19,34 +19,34 @@ module.exports = {
     const discordId = interaction.user.id;
     const fullPseudo = interaction.options.getString("pseudo");
 
+    await interaction.deferReply({ flags: 64 }); // ✅ plus de warning
+
     // Vérifier si l'utilisateur a déjà lié un compte
     const existingAccount = await LinkedAccount.findOne({ discordId });
     if (existingAccount) {
-      return interaction.reply({
-        content: "❌ Tu as déjà lié un compte Riot. Cette opération n'est pas autorisée plus d'une fois.",
-        ephemeral: true
-      });
+      return interaction.editReply("❌ Tu as déjà lié un compte Riot.");
     }
 
-    // Découper en gameName + tagLine
+    // Vérif pseudo complet
     if (!fullPseudo.includes("#")) {
-      return interaction.reply({
-        content: "❌ Merci de fournir ton pseudo complet : `Pseudo#Tag`.",
-        ephemeral: true
-      });
+      return interaction.editReply("❌ Merci de fournir ton pseudo complet : `Pseudo#Tag`.");
     }
 
     const [gameName, tagLine] = fullPseudo.split("#");
 
     try {
-      // Récupérer le PUUID via Riot API
+      // 🔹 Vérifier que Riot renvoie bien un compte
       const response = await axios.get(
         `https://europe.api.riotgames.com/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}?api_key=${RIOT_API_KEY}`
       );
 
+      if (!response.data?.puuid) {
+        return interaction.editReply("❌ Riot n'a pas trouvé ce pseudo. Vérifie l'orthographe !");
+      }
+
       const { puuid } = response.data;
 
-      // Sauvegarde MongoDB
+      // Sauvegarde en DB
       const account = await LinkedAccount.create({
         discordId,
         lolPseudo: gameName,
@@ -54,19 +54,25 @@ module.exports = {
         puuid
       });
 
-      // Mettre en cache
+      // Cache
       linkedCache.set(discordId, { account, timestamp: Date.now() });
 
-      await interaction.reply({
-        content: `✅ Ton compte Riot **${gameName}#${tagLine}** a été lié avec succès !\n(PUUID: \`${puuid.slice(0, 12)}...\`)`,
-        ephemeral: true
-      });
+      return interaction.editReply(
+        `✅ Ton compte Riot **${gameName}#${tagLine}** a été lié avec succès !\n(PUUID: \`${puuid.slice(0, 12)}...\`)`
+      );
+
     } catch (err) {
-      console.error(err.response?.data || err.message);
-      await interaction.reply({
-        content: "❌ Impossible de lier ton compte Riot. Vérifie ton pseudo et réessaie.",
-        ephemeral: true
-      });
+      console.error("Erreur Riot API:", err.response?.data || err.message);
+
+      // Message plus clair selon le cas
+      if (err.response?.status === 403) {
+        return interaction.editReply("❌ Ta clé Riot API est invalide ou expirée.");
+      }
+      if (err.response?.status === 404) {
+        return interaction.editReply("❌ Pseudo Riot introuvable.");
+      }
+
+      return interaction.editReply("❌ Erreur inconnue, réessaie plus tard.");
     }
   }
 };
