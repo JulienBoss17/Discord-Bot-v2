@@ -55,7 +55,6 @@ const commandFiles = getAllCommandFiles(commandsPath);
 
 for (const file of commandFiles) {
   const command = require(file);
-  console.log("Chargement de la commande :", file); // <-- debug
   if (command.data) {
     commands.push(command.data.toJSON());
     client.commands.set(command.data.name, command);
@@ -80,7 +79,7 @@ const rest = new REST({ version: "9" }).setToken(token);
 
 // --- Événements de bienvenue et départ ---
 client.on('guildMemberAdd', async (member) => {
-  const channel = member.guild.channels.cache.find(ch => ch.name === 'bienvenue');
+  const channel = member.guild.channels.cache.find(ch => ch.name === '🛖bienvenue');
   if (!channel) return;
 
   const { name, memberCount } = member.guild;

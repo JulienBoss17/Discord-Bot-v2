@@ -32,7 +32,7 @@ async function loadDataDragon() {
   }
 }
 
-// --- Helper pour récupérer le nom de l'item ---
+// --- Helpers ---
 function getItem(itemId) {
   if (!DATA_DRAGON?.items) return { name: `Item${itemId}`, icon: null };
   const item = DATA_DRAGON.items[itemId];
@@ -43,8 +43,6 @@ function getItem(itemId) {
   };
 }
 
-
-// --- Helper pour récupérer le nom de la rune ---
 function getRune(perkId) {
   if (!DATA_DRAGON?.runes) return { name: perkId.toString(), icon: null };
   for (const tree of DATA_DRAGON.runes) {
@@ -62,8 +60,6 @@ function getRune(perkId) {
   return { name: perkId.toString(), icon: null };
 }
 
-
-// --- Helper pour récupérer le nom du sort ---
 function getSpell(spellId) {
   if (!DATA_DRAGON?.spells) return { name: `Sort${spellId}`, icon: null };
   for (const key in DATA_DRAGON.spells) {
@@ -77,7 +73,6 @@ function getSpell(spellId) {
   }
   return { name: `Sort${spellId}`, icon: null };
 }
-
 
 // --- Récupérer dernier match ---
 async function getLastMatchId(puuid) {
@@ -118,7 +113,18 @@ module.exports = async function checkMatches(client) {
   for (const acc of accounts) {
     try {
       const lastMatchId = await getLastMatchId(acc.puuid);
-      if (!lastMatchId || lastMatchId === acc.lastMatchId) continue;
+      if (!lastMatchId) continue;
+
+      // --- S'assurer que acc.lastMatchId est bien défini depuis la DB ---
+      if (acc.lastMatchId === undefined || acc.lastMatchId === null) {
+        acc.lastMatchId = null;
+      }
+
+      const dbLastMatchId = acc.lastMatchId.toString();
+      const riotLastMatchId = lastMatchId.toString();
+
+      // --- Ne rien envoyer si la dernière partie n'a pas changé ---
+      if (dbLastMatchId && dbLastMatchId === riotLastMatchId) continue;
 
       const matchData = await getMatchDetails(lastMatchId);
       if (!matchData) continue;
@@ -170,7 +176,7 @@ module.exports = async function checkMatches(client) {
               `Dragons / Hérauts : ${participant.dragonKills || 0} / ${participant.heraldKills || 0}`, 
             inline: false 
           },
-          { name: "Sorts", value: spells.join(" | ") || "Aucun", inline: false},
+          { name: "Sorts", value: spells.join(" | ") || "Aucun", inline: false },
           { name: "Runes", value: runes, inline: false },
           { name: "Items", value: items.join(" | ") || "Aucun", inline: false }
         )
@@ -179,8 +185,9 @@ module.exports = async function checkMatches(client) {
 
       await channel.send({ embeds: [embed] });
 
-      acc.lastMatchId = lastMatchId;
-      await acc.save();
+      // --- Mise à jour DB après envoi ---
+      acc.lastMatchId = riotLastMatchId;
+      await acc.save().catch(err => console.error(`Erreur sauvegarde lastMatchId pour ${acc.discordId}:`, err));
 
     } catch (err) {
       console.error(`Erreur match check pour ${acc.discordId}`, err);
