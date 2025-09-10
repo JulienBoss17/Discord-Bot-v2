@@ -2,9 +2,14 @@ const mongoose = require("../utils/mongo");
 
 const linkedAccountSchema = new mongoose.Schema({
   discordId: { type: String, required: true, unique: true },
-  lolPseudo: { type: String, required: true }, // gameName (ex: Sofiaaa)
-  tagLine: { type: String, required: true },   // #0000
-  puuid: { type: String, required: true },     // Riot PUUID unique
-}, { timestamps: true }); // ajoute createdAt / updatedAt automatiquement
+  lolPseudo: { type: String, required: true },
+  tagLine: { type: String, required: true },
+  puuid: { type: String, required: true },
 
-module.exports = mongoose.model("LinkedAccount", linkedAccountSchema);
+  // Ajouts pour suivi
+  lastRank: { type: String, default: null },      // ex: GOLD IV
+  inGame: { type: Boolean, default: false },      // true si en game
+  lastMatchId: { type: String, default: null }    // dernier match posté
+}, { timestamps: true });
+
+module.exports = mongoose.model("linkedaccounts", linkedAccountSchema);

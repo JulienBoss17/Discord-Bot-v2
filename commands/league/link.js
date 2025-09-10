@@ -21,12 +21,6 @@ module.exports = {
 
     await interaction.deferReply({ flags: 64 }); // ✅ plus de warning
 
-    // Vérifier si l'utilisateur a déjà lié un compte
-    const existingAccount = await LinkedAccount.findOne({ discordId });
-    if (existingAccount) {
-      return interaction.editReply("❌ Tu as déjà lié un compte Riot.");
-    }
-
     // Vérif pseudo complet
     if (!fullPseudo.includes("#")) {
       return interaction.editReply("❌ Merci de fournir ton pseudo complet : `Pseudo#Tag`.");
@@ -46,15 +40,34 @@ module.exports = {
 
       const { puuid } = response.data;
 
-      // Sauvegarde en DB
-      const account = await LinkedAccount.create({
+      // Préparer les données à enregistrer ou mettre à jour
+      const accountData = {
         discordId,
         lolPseudo: gameName,
         tagLine,
-        puuid
-      });
+        puuid,
+        lastRank: null,
+        inGame: false,
+        lastMatchId: null
+      };
 
-      // Cache
+      // Vérifier si l'utilisateur a déjà lié un compte
+      const existingAccount = await LinkedAccount.findOne({ discordId });
+
+      if (existingAccount) {
+        // Mettre à jour le compte existant
+        Object.assign(existingAccount, accountData);
+        await existingAccount.save();
+
+        linkedCache.set(discordId, { account: existingAccount, timestamp: Date.now() });
+
+        return interaction.editReply(
+          `✅ Ton compte Riot a été mis à jour : **${gameName}#${tagLine}** !`
+        );
+      }
+
+      // Si pas existant, on crée un nouveau compte
+      const account = await LinkedAccount.create(accountData);
       linkedCache.set(discordId, { account, timestamp: Date.now() });
 
       return interaction.editReply(

@@ -9,6 +9,8 @@ const { fr } = require('date-fns/locale');
 const LinkedAccount = require("./models/LinkedAccount");
 const { requireLinked } = require("./utils/requireLinked");
 const { InteractionResponseFlags } = require('discord-api-types/v10');
+const checkRanks = require("./utils/checkRanks");
+const checkMatches = require("./utils/checkMatches");
 
 const clientId = process.env.CLIENT_ID;
 const guildId = process.env.GUILD_ID;
@@ -129,11 +131,23 @@ if (command.lolCommand) {
   } catch (error) {
     console.error(error);
     await interaction.reply({
-      content: "Ton message",
+      content: "",
       flags: InteractionResponseFlags.ephemeral
     });
   }
 });
+
+// --- Scheduler automatique ---
+client.once("clientReady", () => {
+  console.log(`🚀 Bot prêt en tant que ${client.user.tag}`);
+
+  // Rank check : toutes les 30 minutes
+  setInterval(() => checkRanks(client), 30 * 60 * 1000);
+
+  // Match history check : toutes les 2 minutes
+  setInterval(() => checkMatches(client), 2 * 60 * 1000);
+});
+
 
 // --- Lancement du bot ---
 client.login(token)
