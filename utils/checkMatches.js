@@ -33,32 +33,51 @@ async function loadDataDragon() {
 }
 
 // --- Helper pour récupérer le nom de l'item ---
-function getItemName(itemId) {
-  if (!DATA_DRAGON?.items) return `Item${itemId}`;
-  return DATA_DRAGON.items[itemId]?.name || `Item${itemId}`;
+function getItem(itemId) {
+  if (!DATA_DRAGON?.items) return { name: `Item${itemId}`, icon: null };
+  const item = DATA_DRAGON.items[itemId];
+  if (!item) return { name: `Item${itemId}`, icon: null };
+  return { 
+    name: item.name,
+    icon: `https://ddragon.leagueoflegends.com/cdn/${DATA_DRAGON.patch}/img/item/${item.image.full}`
+  };
 }
 
+
 // --- Helper pour récupérer le nom de la rune ---
-function getRuneName(perkId) {
-  if (!DATA_DRAGON?.runes) return perkId.toString();
+function getRune(perkId) {
+  if (!DATA_DRAGON?.runes) return { name: perkId.toString(), icon: null };
   for (const tree of DATA_DRAGON.runes) {
-    for (const style of tree.slots) {
-      for (const rune of style.runes) {
-        if (rune.id === perkId) return rune.name;
+    for (const slot of tree.slots) {
+      for (const rune of slot.runes) {
+        if (rune.id === perkId) {
+          return {
+            name: rune.name,
+            icon: `https://ddragon.leagueoflegends.com/cdn/img/${rune.icon}`
+          };
+        }
       }
     }
   }
-  return perkId.toString();
+  return { name: perkId.toString(), icon: null };
 }
 
+
 // --- Helper pour récupérer le nom du sort ---
-function getSpellName(spellId) {
-  if (!DATA_DRAGON?.spells) return `Sort${spellId}`;
+function getSpell(spellId) {
+  if (!DATA_DRAGON?.spells) return { name: `Sort${spellId}`, icon: null };
   for (const key in DATA_DRAGON.spells) {
-    if (parseInt(DATA_DRAGON.spells[key].key) === spellId) return DATA_DRAGON.spells[key].name;
+    if (parseInt(DATA_DRAGON.spells[key].key) === spellId) {
+      const spell = DATA_DRAGON.spells[key];
+      return {
+        name: spell.name,
+        icon: `https://ddragon.leagueoflegends.com/cdn/${DATA_DRAGON.patch}/img/spell/${spell.image.full}`
+      };
+    }
   }
-  return `Sort${spellId}`;
+  return { name: `Sort${spellId}`, icon: null };
 }
+
 
 // --- Récupérer dernier match ---
 async function getLastMatchId(puuid) {
@@ -107,27 +126,27 @@ module.exports = async function checkMatches(client) {
       const participant = matchData.info.participants.find(p => p.puuid === acc.puuid);
       if (!participant) continue;
 
-      // Items
+      // --- Sorts ---
+      const spells = [];
+      if (participant.summoner1Id) spells.push(getSpell(participant.summoner1Id).name);
+      if (participant.summoner2Id) spells.push(getSpell(participant.summoner2Id).name);
+
+      // --- Runes ---
+      const runes = participant.perks?.styles
+        .flatMap(style => style.selections.map(sel => getRune(sel.perk).name))
+        .join(", ") || "Aucune";
+
+      // --- Items ---
       const items = [];
       for (let i = 0; i <= 6; i++) {
-        if (participant[`item${i}`] && participant[`item${i}`] !== 0) {
-          items.push(getItemName(participant[`item${i}`]));
-        }
+        const id = participant[`item${i}`];
+        if (id && id !== 0) items.push(getItem(id).name);
       }
-
-      // Sorts
-      const summonerSpells = [];
-      if (participant.summoner1Id) summonerSpells.push(getSpellName(participant.summoner1Id));
-      if (participant.summoner2Id) summonerSpells.push(getSpellName(participant.summoner2Id));
-
-      // Runes
-      const runes = participant.perks?.styles?.map(style =>
-        style.selections.map(sel => getRuneName(sel.perk)).join(", ")
-      ).join(" | ") || "Aucune";
 
       const embed = new EmbedBuilder()
         .setColor(participant.win ? 0x00FF00 : 0xFF0000)
         .setTitle(`📊 ${acc.lolPseudo} a terminé une partie`)
+        .setThumbnail(`https://ddragon.leagueoflegends.com/cdn/${DATA_DRAGON.patch}/img/champion/${participant.championName}.png`)
         .addFields(
           { name: "Champion", value: participant.championName, inline: true },
           { name: "Rôle / Lane", value: participant.teamPosition || "Inconnu", inline: true },
@@ -135,7 +154,11 @@ module.exports = async function checkMatches(client) {
           { name: "K/D/A", value: `${participant.kills}/${participant.deaths}/${participant.assists}`, inline: true },
           { name: "CS", value: participant.totalMinionsKilled.toString(), inline: true },
           { name: "Gold", value: participant.goldEarned.toString(), inline: true },
-          { name: "Durée", value: `${Math.floor(matchData.info.gameDuration / 60)}m ${matchData.info.gameDuration % 60}s`, inline: true },
+          { 
+            name: "Durée", 
+            value: `${Math.floor(matchData.info.gameDuration / 60)}m ${matchData.info.gameDuration % 60}s`, 
+            inline: true 
+          },
           { 
             name: "Dégâts / Soins / Vision", 
             value: 
@@ -147,8 +170,8 @@ module.exports = async function checkMatches(client) {
               `Dragons / Hérauts : ${participant.dragonKills || 0} / ${participant.heraldKills || 0}`, 
             inline: false 
           },
-          { name: "Sorts", value: summonerSpells.join(" | ") || "Aucun", inline: true },
-          { name: "Runes", value: runes || "Aucune", inline: true },
+          { name: "Sorts", value: spells.join(" | ") || "Aucun", inline: false},
+          { name: "Runes", value: runes, inline: false },
           { name: "Items", value: items.join(" | ") || "Aucun", inline: false }
         )
         .setFooter({ text: `Patch ${DATA_DRAGON.patch}` })
