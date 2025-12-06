@@ -95,7 +95,7 @@ client.on('guildMemberAdd', async (member) => {
 });
 
 client.on('guildMemberRemove', async (member) => {
-  const channel = member.guild.channels.cache.find(ch => ch.name === 'ʙɪᴇɴᴠᴇɴᴜᴇ');
+  const channel = member.guild.channels.cache.find(ch => ch.name === '🛖bienvenue');
   if (!channel) return;
 
   const timeAgo = formatDistanceToNow(member.joinedAt, { addSuffix: true, locale: fr });

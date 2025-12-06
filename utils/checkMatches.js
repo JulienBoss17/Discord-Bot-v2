@@ -44,6 +44,7 @@ function getItem(itemId) {
 }
 
 function getRune(perkId) {
+  if (!perkId) return { name: "Inconnu", icon: null };
   if (!DATA_DRAGON?.runes) return { name: perkId.toString(), icon: null };
   for (const tree of DATA_DRAGON.runes) {
     for (const slot of tree.slots) {
@@ -61,6 +62,7 @@ function getRune(perkId) {
 }
 
 function getSpell(spellId) {
+  if (!spellId) return { name: "Inconnu", icon: null };
   if (!DATA_DRAGON?.spells) return { name: `Sort${spellId}`, icon: null };
   for (const key in DATA_DRAGON.spells) {
     if (parseInt(DATA_DRAGON.spells[key].key) === spellId) {
@@ -89,6 +91,7 @@ async function getLastMatchId(puuid) {
 
 // --- Récupérer détails du match ---
 async function getMatchDetails(matchId) {
+  if (!matchId) return null;
   try {
     const res = await axios.get(`https://${REGION}.api.riotgames.com/lol/match/v5/matches/${matchId}?api_key=${RIOT_API_KEY}`);
     return res.data;
@@ -115,19 +118,15 @@ module.exports = async function checkMatches(client) {
       const lastMatchId = await getLastMatchId(acc.puuid);
       if (!lastMatchId) continue;
 
-      // --- S'assurer que acc.lastMatchId est bien défini depuis la DB ---
-      if (acc.lastMatchId === undefined || acc.lastMatchId === null) {
-        acc.lastMatchId = null;
-      }
-
-      const dbLastMatchId = acc.lastMatchId.toString();
-      const riotLastMatchId = lastMatchId.toString();
+      // --- Conversions sécurisées ---
+      const dbLastMatchId = acc.lastMatchId?.toString() || null;
+      const riotLastMatchId = lastMatchId?.toString() || null;
 
       // --- Ne rien envoyer si la dernière partie n'a pas changé ---
-      if (dbLastMatchId && dbLastMatchId === riotLastMatchId) continue;
+      if (dbLastMatchId && riotLastMatchId && dbLastMatchId === riotLastMatchId) continue;
 
       const matchData = await getMatchDetails(lastMatchId);
-      if (!matchData) continue;
+      if (!matchData?.info?.participants) continue;
 
       const participant = matchData.info.participants.find(p => p.puuid === acc.puuid);
       if (!participant) continue;
@@ -139,7 +138,7 @@ module.exports = async function checkMatches(client) {
 
       // --- Runes ---
       const runes = participant.perks?.styles
-        .flatMap(style => style.selections.map(sel => getRune(sel.perk).name))
+        ?.flatMap(style => style.selections.map(sel => getRune(sel.perk).name))
         .join(", ") || "Aucune";
 
       // --- Items ---
@@ -154,25 +153,25 @@ module.exports = async function checkMatches(client) {
         .setTitle(`📊 ${acc.lolPseudo} a terminé une partie`)
         .setThumbnail(`https://ddragon.leagueoflegends.com/cdn/${DATA_DRAGON.patch}/img/champion/${participant.championName}.png`)
         .addFields(
-          { name: "Champion", value: participant.championName, inline: true },
+          { name: "Champion", value: participant.championName || "Inconnu", inline: true },
           { name: "Rôle / Lane", value: participant.teamPosition || "Inconnu", inline: true },
           { name: "Résultat", value: participant.win ? "Victoire 🏆" : "Défaite 💀", inline: true },
           { name: "K/D/A", value: `${participant.kills}/${participant.deaths}/${participant.assists}`, inline: true },
-          { name: "CS", value: participant.totalMinionsKilled.toString(), inline: true },
-          { name: "Gold", value: participant.goldEarned.toString(), inline: true },
+          { name: "CS", value: participant.totalMinionsKilled?.toString() || "0", inline: true },
+          { name: "Gold", value: participant.goldEarned?.toString() || "0", inline: true },
           { 
             name: "Durée", 
-            value: `${Math.floor(matchData.info.gameDuration / 60)}m ${matchData.info.gameDuration % 60}s`, 
+            value: `${Math.floor((matchData.info.gameDuration || 0) / 60)}m ${(matchData.info.gameDuration || 0) % 60}s`, 
             inline: true 
           },
           { 
             name: "Dégâts / Soins / Vision", 
             value: 
-              `Dégâts aux champions : ${participant.totalDamageDealtToChampions}\n` +
-              `Dégâts subis : ${participant.totalDamageTaken}\n` +
-              `Soins : ${participant.totalHeal}\n` +
-              `Vision : ${participant.visionScore}\n` +
-              `Tours détruites : ${participant.turretKills}\n` +
+              `Dégâts aux champions : ${participant.totalDamageDealtToChampions || 0}\n` +
+              `Dégâts subis : ${participant.totalDamageTaken || 0}\n` +
+              `Soins : ${participant.totalHeal || 0}\n` +
+              `Vision : ${participant.visionScore || 0}\n` +
+              `Tours détruites : ${participant.turretKills || 0}\n` +
               `Dragons / Hérauts : ${participant.dragonKills || 0} / ${participant.heraldKills || 0}`, 
             inline: false 
           },
